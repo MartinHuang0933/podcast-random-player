@@ -1,0 +1,82 @@
+// Prisma Schema for Podcast Random Player
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Podcast 節目表
+model Podcast {
+  id              String         @id @default(cuid())
+  externalId      String         @unique
+  title           String
+  author          String?
+  description     String?
+  coverImage      String?
+  feedUrl         String         @unique
+  website         String?
+  language        String?
+  lastFetchedAt   DateTime       @default(now())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  episodes        Episode[]
+  subscriptions   Subscription[]
+  
+  @@index([externalId])
+  @@map("podcasts")
+}
+
+// Podcast 單集表
+model Episode {
+  id          String     @id @default(cuid())
+  externalId  String     @unique
+  podcastId   String
+  title       String
+  description String?
+  audioUrl    String
+  duration    Int        // 秒數
+  pubDate     DateTime
+  coverImage  String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  podcast     Podcast    @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  bookmarks   Bookmark[]
+  
+  @@index([podcastId])
+  @@index([pubDate])
+  @@map("episodes")
+}
+
+// 收藏表（簡化版，無用戶系統）
+model Bookmark {
+  id          String   @id @default(cuid())
+  sessionId   String   // 用 sessionId 代替 userId
+  episodeId   String
+  currentTime Int      @default(0)
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  episode     Episode  @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  
+  @@unique([sessionId, episodeId])
+  @@index([sessionId])
+  @@index([episodeId])
+  @@map("bookmarks")
+}
+
+// 追蹤節目表
+model Subscription {
+  id          String   @id @default(cuid())
+  sessionId   String
+  podcastId   String
+  createdAt   DateTime @default(now())
+  podcast     Podcast  @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  
+  @@unique([sessionId, podcastId])
+  @@index([sessionId])
+  @@map("subscriptions")
+}
