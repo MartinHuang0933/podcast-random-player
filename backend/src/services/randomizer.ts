@@ -8,6 +8,7 @@ interface RandomResult {
     title: string;
     author: string | null;
     coverImage: string | null;
+    applePodcastId: string | null;
   };
   episode: {
     id: string;
@@ -80,6 +81,7 @@ export class RandomizerService {
         title: podcast.title,
         author: podcast.author,
         coverImage: podcast.coverImage,
+        applePodcastId: podcast.applePodcastId,
       },
       episode: {
         id: episode.id,

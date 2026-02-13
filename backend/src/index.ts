@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import routes from './routes';
+import { refreshFeeds, startFeedScheduler } from './services/feedRefresher';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -61,6 +62,12 @@ app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
   console.log(`📡 API: http://localhost:${PORT}/api`);
   console.log(`💚 Health: http://localhost:${PORT}/api/health`);
+
+  // 啟動時抓取最新 feed（增量更新，不刪舊資料）
+  refreshFeeds().catch(err => console.error('啟動時 feed 更新失敗:', err));
+
+  // 每天凌晨 3 點自動更新
+  startFeedScheduler();
 });
 
 export default app;
