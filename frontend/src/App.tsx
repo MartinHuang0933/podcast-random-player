@@ -115,7 +115,7 @@ function App() {
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z" />
               </svg>
             </div>
-            <span className="text-lg font-bold text-stone-800">隨機播客</span>
+            <span className="text-lg font-bold text-stone-800">隨機 Podcast</span>
           </div>
           {appleUrl && (
             <a
@@ -134,7 +134,7 @@ function App() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-5 py-2">
+      <main className="flex-1 flex flex-col items-center px-5 py-2">
         <div className="max-w-lg w-full">
 
           {/* Cover art */}
