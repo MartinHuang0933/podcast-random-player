@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import Parser from 'rss-parser';
-import cron from 'node-cron';
+import https from 'https';
 
 const prisma = new PrismaClient();
 const parser = new Parser();
@@ -33,16 +33,22 @@ function parseDuration(d: string | number | undefined): number {
   return parseInt(String(d), 10) || 1800;
 }
 
-/**
- * 透過 iTunes Lookup API 取得 episode 的 Apple ID，
- * 用 episodeGuid 與資料庫的 externalId 比對。
- */
+function httpsGet(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => resolve(data));
+    }).on('error', reject);
+  });
+}
+
 async function fetchAppleEpisodeIds(applePodcastId: string): Promise<Map<string, number>> {
   const guidToTrackId = new Map<string, number>();
   try {
     const url = `https://itunes.apple.com/lookup?id=${applePodcastId}&media=podcast&entity=podcastEpisode&limit=200`;
-    const res = await fetch(url);
-    const data = await res.json();
+    const raw = await httpsGet(url);
+    const data = JSON.parse(raw);
     for (const item of data.results || []) {
       if (item.kind === 'podcast-episode' && item.episodeGuid && item.trackId) {
         guidToTrackId.set(item.episodeGuid, item.trackId);
@@ -87,7 +93,6 @@ export async function refreshFeeds(): Promise<void> {
         },
       });
 
-      // 取得 Apple episode ID 對照表
       const appleIds = await fetchAppleEpisodeIds(feedInfo.applePodcastId);
 
       const items = (feed.items || [])
@@ -119,7 +124,6 @@ export async function refreshFeeds(): Promise<void> {
           });
           newEpisodes++;
         } else if (!existing.appleEpisodeId && appleEpisodeId) {
-          // 補填之前缺少的 Apple episode ID
           await prisma.episode.update({
             where: { externalId },
             data: { appleEpisodeId },
@@ -137,10 +141,14 @@ export async function refreshFeeds(): Promise<void> {
 }
 
 export function startFeedScheduler(): void {
-  cron.schedule('0 3 * * *', () => {
-    console.log('⏰ 排程觸發：開始每日 feed 更新');
-    refreshFeeds().catch(err => console.error('排程更新失敗:', err));
-  });
-
-  console.log('📅 Feed 排程已啟動（每天 03:00 更新）');
+  try {
+    const cron = require('node-cron');
+    cron.schedule('0 3 * * *', () => {
+      console.log('⏰ 排程觸發：開始每日 feed 更新');
+      refreshFeeds().catch((err: unknown) => console.error('排程更新失敗:', err));
+    });
+    console.log('📅 Feed 排程已啟動（每天 03:00 更新）');
+  } catch (err) {
+    console.error('⚠️ node-cron 載入失敗，排程未啟動:', err);
+  }
 }
