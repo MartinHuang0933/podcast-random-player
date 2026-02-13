@@ -112,7 +112,7 @@ function App() {
       <audio ref={audioRef} src={audioUrl || undefined} />
 
       {/* Top bar */}
-      <header className="px-5 pt-6 pb-2">
+      <header className="px-5 pt-4 pb-1">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center">
@@ -140,20 +140,20 @@ function App() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-5 py-4">
+      <main className="flex-1 flex flex-col items-center justify-center px-5 py-2">
         <div className="max-w-lg w-full">
 
           {/* Cover art */}
-          <div className="mb-6">
+          <div className="mb-4 flex justify-center">
             {coverImage ? (
               <img
                 src={coverImage}
                 alt={podcastTitle || ''}
-                className="w-full aspect-square object-cover rounded-2xl shadow-lg"
+                className="w-3/5 max-w-[240px] aspect-square object-cover rounded-2xl shadow-lg"
               />
             ) : (
-              <div className="w-full aspect-square rounded-2xl bg-gradient-to-br from-brand-200 via-brand-100 to-orange-100 flex items-center justify-center">
-                <svg className="w-24 h-24 text-brand-400" fill="currentColor" viewBox="0 0 24 24">
+              <div className="w-3/5 max-w-[240px] aspect-square rounded-2xl bg-gradient-to-br from-brand-200 via-brand-100 to-orange-100 flex items-center justify-center">
+                <svg className="w-16 h-16 text-brand-400" fill="currentColor" viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="3" />
                   <circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" strokeWidth="1.5" opacity=".6" />
                   <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.5" opacity=".3" />
@@ -163,7 +163,7 @@ function App() {
           </div>
 
           {/* Episode info */}
-          <div className="mb-5 min-h-[60px]">
+          <div className="mb-3 min-h-[52px] text-center">
             {episodeTitle ? (
               <>
                 <h2 className="text-xl font-bold text-stone-900 line-clamp-2 leading-tight">
@@ -181,7 +181,7 @@ function App() {
 
           {/* Progress */}
           {audioUrl && (
-            <div className="mb-4">
+            <div className="mb-3">
               <input
                 type="range"
                 min="0"
@@ -198,7 +198,7 @@ function App() {
           )}
 
           {/* Controls */}
-          <div className="flex items-center justify-center gap-6 mb-6">
+          <div className="flex items-center justify-center gap-6 mb-4">
             {audioUrl && (
               <button
                 onClick={() => skip(-15)}
@@ -258,7 +258,7 @@ function App() {
 
           {/* Volume */}
           {audioUrl && (
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-3 flex items-center gap-3">
               <svg className="w-4 h-4 text-stone-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.49 4.49 0 0 0 2.5-4z" />
               </svg>
