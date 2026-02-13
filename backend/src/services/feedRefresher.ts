@@ -5,7 +5,6 @@ import cron from 'node-cron';
 const prisma = new PrismaClient();
 const parser = new Parser();
 
-// 與 seed.ts 保持同步的 Feed 清單
 const PODCAST_FEEDS = [
   {
     feedUrl: 'https://feeds.soundon.fm/podcasts/954689a5-3096-43a4-a80b-7810b219cef3.xml',
@@ -35,10 +34,26 @@ function parseDuration(d: string | number | undefined): number {
 }
 
 /**
- * 抓取所有 feed，增量更新（不刪舊資料）。
- * 不存在的 podcast 會建立，已存在的會更新 metadata。
- * 新 episode 會新增，已存在的跳過。
+ * 透過 iTunes Lookup API 取得 episode 的 Apple ID，
+ * 用 episodeGuid 與資料庫的 externalId 比對。
  */
+async function fetchAppleEpisodeIds(applePodcastId: string): Promise<Map<string, number>> {
+  const guidToTrackId = new Map<string, number>();
+  try {
+    const url = `https://itunes.apple.com/lookup?id=${applePodcastId}&media=podcast&entity=podcastEpisode&limit=200`;
+    const res = await fetch(url);
+    const data = await res.json();
+    for (const item of data.results || []) {
+      if (item.kind === 'podcast-episode' && item.episodeGuid && item.trackId) {
+        guidToTrackId.set(item.episodeGuid, item.trackId);
+      }
+    }
+  } catch (err) {
+    console.error(`  ⚠️ iTunes Lookup 失敗 (id=${applePodcastId}):`, err);
+  }
+  return guidToTrackId;
+}
+
 export async function refreshFeeds(): Promise<void> {
   console.log('🔄 開始更新 Podcast feeds...');
 
@@ -72,20 +87,23 @@ export async function refreshFeeds(): Promise<void> {
         },
       });
 
-      // 取有音檔的 episode（最多 30 集）
+      // 取得 Apple episode ID 對照表
+      const appleIds = await fetchAppleEpisodeIds(feedInfo.applePodcastId);
+
       const items = (feed.items || [])
         .filter(item => item.enclosure?.url)
         .slice(0, 30);
 
       for (const item of items) {
         const externalId = item.guid || item.link || `${feedInfo.feedUrl}-${item.title}`;
+        const appleEpisodeId = appleIds.get(externalId)?.toString() || null;
 
-        const exists = await prisma.episode.findUnique({
+        const existing = await prisma.episode.findUnique({
           where: { externalId },
-          select: { id: true },
+          select: { id: true, appleEpisodeId: true },
         });
 
-        if (!exists) {
+        if (!existing) {
           await prisma.episode.create({
             data: {
               externalId,
@@ -96,13 +114,20 @@ export async function refreshFeeds(): Promise<void> {
               duration: parseDuration(item.itunes?.duration),
               pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
               coverImage: item.itunes?.image || null,
+              appleEpisodeId,
             },
           });
           newEpisodes++;
+        } else if (!existing.appleEpisodeId && appleEpisodeId) {
+          // 補填之前缺少的 Apple episode ID
+          await prisma.episode.update({
+            where: { externalId },
+            data: { appleEpisodeId },
+          });
         }
       }
 
-      console.log(`  ✅ ${podcast.title} - 更新完成`);
+      console.log(`  ✅ ${podcast.title} - 更新完成 (Apple IDs: ${appleIds.size})`);
     } catch (error) {
       console.error(`  ❌ 更新失敗: ${feedInfo.feedUrl}`, error);
     }
@@ -111,9 +136,6 @@ export async function refreshFeeds(): Promise<void> {
   console.log(`🔄 Feed 更新完成，新增 ${newEpisodes} 集 episode`);
 }
 
-/**
- * 啟動排程：每天凌晨 3 點更新 feeds
- */
 export function startFeedScheduler(): void {
   cron.schedule('0 3 * * *', () => {
     console.log('⏰ 排程觸發：開始每日 feed 更新');

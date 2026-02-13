@@ -5,8 +5,9 @@ import { getRandomEpisode } from './services/api';
 function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [podcastData, setPodcastData] = useState<any>(null);
-  
+  const [applePodcastId, setApplePodcastId] = useState<string | null>(null);
+  const [appleEpisodeId, setAppleEpisodeId] = useState<string | null>(null);
+
   const {
     isPlaying,
     currentTime,
@@ -25,15 +26,14 @@ function App() {
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // 处理随机播放
   const handleRandomPlay = async () => {
     setLoading(true);
     setError(null);
-    
     try {
       const data = await getRandomEpisode();
-      setPodcastData(data); // 保存完整数据供 Apple Podcast 链接使用
-      
+      setApplePodcastId(data.podcast.applePodcastId || null);
+      setAppleEpisodeId(data.episode.appleEpisodeId || null);
+
       loadAudio({
         audioUrl: data.episode.audioUrl,
         episodeId: data.episode.id,
@@ -42,7 +42,7 @@ function App() {
         coverImage: data.podcast.coverImage,
         startTime: data.startTime,
       });
-      
+
       setTimeout(() => {
         if (audioRef.current) {
           audioRef.current.load();
@@ -52,280 +52,237 @@ function App() {
         }
       }, 100);
     } catch (err: any) {
-      setError(err.response?.data?.error?.message || '载入失败');
+      setError(err.response?.data?.error?.message || '載入失敗，請稍後再試');
     } finally {
       setLoading(false);
     }
   };
 
-  // 在 Apple Podcast 打开
-  const handleOpenInApple = () => {
-    if (!podcastData) return;
-    
-    const applePodcastId = podcastData.podcast.applePodcastId;
-    const appleEpisodeId = podcastData.episode.appleEpisodeId;
-    
-    if (applePodcastId && appleEpisodeId) {
-      // 使用 Apple Podcast 深链接
-      window.open(`https://podcasts.apple.com/podcast/id${applePodcastId}?i=${appleEpisodeId}`, '_blank');
-    } else if (applePodcastId) {
-      // 只有 podcast ID，打开 podcast 主页
-      window.open(`https://podcasts.apple.com/podcast/id${applePodcastId}`, '_blank');
-    } else {
-      // 搜索 podcast 名称
-      const searchQuery = encodeURIComponent(podcastTitle || '');
-      window.open(`https://podcasts.apple.com/search?term=${searchQuery}`, '_blank');
-    }
-  };
+  const appleUrl = applePodcastId
+    ? appleEpisodeId
+      ? `https://podcasts.apple.com/podcast/id${applePodcastId}?i=${appleEpisodeId}`
+      : `https://podcasts.apple.com/podcast/id${applePodcastId}`
+    : null;
 
-  // 音频事件处理
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const handleLoadedMetadata = () => setDuration(audio.duration);
-    const handleEnded = () => setPlaying(false);
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('ended', handleEnded);
-
+    const onTime = () => setCurrentTime(audio.currentTime);
+    const onMeta = () => setDuration(audio.duration);
+    const onEnd = () => setPlaying(false);
+    audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('loadedmetadata', onMeta);
+    audio.addEventListener('ended', onEnd);
     return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('loadedmetadata', onMeta);
+      audio.removeEventListener('ended', onEnd);
     };
   }, []);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (isPlaying) {
-      audio.play();
-    } else {
-      audio.pause();
-    }
+    if (!audioRef.current) return;
+    isPlaying ? audioRef.current.play() : audioRef.current.pause();
   }, [isPlaying]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
-    }
+    if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
-  const formatTime = (seconds: number) => {
-    if (!seconds || !isFinite(seconds)) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  const fmt = (s: number) => {
+    if (!s || !isFinite(s)) return '0:00';
+    const m = Math.floor(s / 60);
+    return `${m}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
   };
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTime = parseFloat(e.target.value);
-    if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
-      setCurrentTime(newTime);
-    }
+  const seek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const t = parseFloat(e.target.value);
+    if (audioRef.current) { audioRef.current.currentTime = t; setCurrentTime(t); }
   };
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const skip = (sec: number) => {
+    if (!audioRef.current) return;
+    const t = Math.max(0, Math.min(audioRef.current.currentTime + sec, duration));
+    audioRef.current.currentTime = t;
+    setCurrentTime(t);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-400 via-cyan-500 to-blue-500 flex flex-col">
+    <div className="min-h-screen bg-surface-50 flex flex-col">
       <audio ref={audioRef} src={audioUrl || undefined} />
-      
-      {/* Header */}
-      <header className="p-6">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg">
-              <span className="text-2xl">🎙️</span>
+
+      {/* Top bar */}
+      <header className="px-5 pt-6 pb-2">
+        <div className="max-w-lg mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z" />
+              </svg>
             </div>
-            <h1 className="text-2xl font-bold text-white">Podcast Radio</h1>
+            <span className="text-lg font-bold text-stone-800">隨機播客</span>
           </div>
-          
-          {audioUrl && (
-            <button
-              onClick={handleOpenInApple}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full transition-all font-medium"
+          {appleUrl && (
+            <a
+              href={appleUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1 transition-colors"
             >
-              <span className="text-lg">🎵</span>
-              在 Apple Podcast 打开
-            </button>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+              </svg>
+              在 Apple Podcasts 開啟
+            </a>
           )}
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center p-6">
-        <div className="max-w-2xl w-full">
-          
-          {/* Album Art & Info */}
-          <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20">
-            
+      {/* Main content */}
+      <main className="flex-1 flex flex-col items-center justify-center px-5 py-4">
+        <div className="max-w-lg w-full">
+
+          {/* Cover art */}
+          <div className="mb-6">
             {coverImage ? (
-              <div className="mb-8">
-                <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-gray-800 to-gray-900">
-                  <img
-                    src={coverImage}
-                    alt={podcastTitle || 'Podcast'}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
+              <img
+                src={coverImage}
+                alt={podcastTitle || ''}
+                className="w-full aspect-square object-cover rounded-2xl shadow-lg"
+              />
             ) : (
-              <div className="mb-8 aspect-square rounded-2xl bg-gradient-to-br from-teal-600 to-cyan-600 flex items-center justify-center shadow-2xl">
-                <span className="text-9xl">🎙️</span>
-              </div>
-            )}
-
-            {/* Episode Info */}
-            {episodeTitle ? (
-              <div className="mb-8 text-center">
-                <h2 className="text-2xl font-bold text-white mb-2 line-clamp-2">
-                  {episodeTitle}
-                </h2>
-                <p className="text-white/80 text-lg font-medium">{podcastTitle}</p>
-              </div>
-            ) : (
-              <div className="mb-8 text-center">
-                <h2 className="text-3xl font-bold text-white mb-3">
-                  Discover Random Podcasts
-                </h2>
-                <p className="text-white/80 text-lg">
-                  点击下方按钮开始随机收听！
-                </p>
-              </div>
-            )}
-
-            {/* Progress Bar */}
-            {audioUrl && (
-              <div className="mb-6">
-                <div className="relative h-2 bg-white/20 rounded-full overflow-hidden mb-2">
-                  <div
-                    className="absolute left-0 top-0 h-full bg-white rounded-full transition-all"
-                    style={{ width: `${progress}%` }}
-                  />
-                  <input
-                    type="range"
-                    min="0"
-                    max={duration || 0}
-                    value={currentTime}
-                    onChange={handleSeek}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                </div>
-                <div className="flex justify-between text-sm text-white/70 font-medium">
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Playback Controls */}
-            <div className="flex items-center justify-center gap-6 mb-6">
-              {audioUrl && (
-                <>
-                  <button
-                    onClick={() => {
-                      if (audioRef.current) {
-                        audioRef.current.currentTime = Math.max(0, currentTime - 15);
-                      }
-                    }}
-                    className="w-12 h-12 flex items-center justify-center text-white hover:bg-white/20 rounded-full transition-all"
-                  >
-                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
-                    </svg>
-                    <span className="text-xs absolute mt-12">-15s</span>
-                  </button>
-                </>
-              )}
-
-              <button
-                onClick={audioUrl ? () => setPlaying(!isPlaying) : handleRandomPlay}
-                disabled={loading}
-                className="w-20 h-20 bg-white hover:scale-105 text-teal-600 rounded-full flex items-center justify-center text-3xl shadow-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <div className="w-8 h-8 border-4 border-teal-600 border-t-transparent rounded-full animate-spin" />
-                ) : isPlaying ? (
-                  '⏸'
-                ) : (
-                  '▶️'
-                )}
-              </button>
-
-              {audioUrl && (
-                <button
-                  onClick={() => {
-                    if (audioRef.current) {
-                      audioRef.current.currentTime = Math.min(duration, currentTime + 30);
-                    }
-                  }}
-                  className="w-12 h-12 flex items-center justify-center text-white hover:bg-white/20 rounded-full transition-all"
-                >
-                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm2 14.5l-6-4.5 6-4.5v9z"/>
-                  </svg>
-                  <span className="text-xs absolute mt-12">+30s</span>
-                </button>
-              )}
-            </div>
-
-            {/* Next Random Button */}
-            {audioUrl && (
-              <button
-                onClick={handleRandomPlay}
-                disabled={loading}
-                className="w-full bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-bold py-4 rounded-2xl transition-all transform hover:scale-[1.02] disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                <span className="text-xl">🎲</span>
-                下一个随机
-              </button>
-            )}
-
-            {/* Volume Control */}
-            {audioUrl && (
-              <div className="mt-6 flex items-center gap-4">
-                <span className="text-white text-xl">🔊</span>
-                <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-white rounded-full transition-all"
-                    style={{ width: `${volume * 100}%` }}
-                  />
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={volume}
-                    onChange={(e) => setVolume(parseFloat(e.target.value))}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                </div>
-                <span className="text-white/70 text-sm font-medium min-w-[3ch]">
-                  {Math.round(volume * 100)}%
-                </span>
+              <div className="w-full aspect-square rounded-2xl bg-gradient-to-br from-brand-200 via-brand-100 to-orange-100 flex items-center justify-center">
+                <svg className="w-24 h-24 text-brand-400" fill="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="3" />
+                  <circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" strokeWidth="1.5" opacity=".6" />
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.5" opacity=".3" />
+                </svg>
               </div>
             )}
           </div>
 
-          {/* Error Message */}
+          {/* Episode info */}
+          <div className="mb-5 min-h-[60px]">
+            {episodeTitle ? (
+              <>
+                <h2 className="text-xl font-bold text-stone-900 line-clamp-2 leading-tight">
+                  {episodeTitle}
+                </h2>
+                <p className="text-sm text-stone-500 mt-1 font-medium">{podcastTitle}</p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold text-stone-900">探索隨機 Podcast</h2>
+                <p className="text-sm text-stone-500 mt-1">按下播放，發現你的下一個最愛</p>
+              </>
+            )}
+          </div>
+
+          {/* Progress */}
+          {audioUrl && (
+            <div className="mb-4">
+              <input
+                type="range"
+                min="0"
+                max={duration || 0}
+                value={currentTime}
+                onChange={seek}
+                className="range-brand w-full"
+              />
+              <div className="flex justify-between text-[11px] text-stone-400 mt-1 font-medium tabular-nums">
+                <span>{fmt(currentTime)}</span>
+                <span>{fmt(duration)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Controls */}
+          <div className="flex items-center justify-center gap-6 mb-6">
+            {audioUrl && (
+              <button
+                onClick={() => skip(-15)}
+                className="w-11 h-11 flex items-center justify-center text-stone-500 hover:text-stone-800 rounded-full hover:bg-surface-200 transition-all active:scale-90"
+              >
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                </svg>
+                <span className="absolute text-[8px] font-bold mt-0.5">15</span>
+              </button>
+            )}
+
+            <button
+              onClick={audioUrl ? () => setPlaying(!isPlaying) : handleRandomPlay}
+              disabled={loading}
+              className="w-16 h-16 bg-brand-500 hover:bg-brand-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-brand-500/30 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <div className="w-6 h-6 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />
+              ) : isPlaying ? (
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </button>
+
+            {audioUrl && (
+              <button
+                onClick={() => skip(30)}
+                className="w-11 h-11 flex items-center justify-center text-stone-500 hover:text-stone-800 rounded-full hover:bg-surface-200 transition-all active:scale-90"
+              >
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 4v6h-6" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg>
+                <span className="absolute text-[8px] font-bold mt-0.5">30</span>
+              </button>
+            )}
+          </div>
+
+          {/* Next random */}
+          {audioUrl && (
+            <button
+              onClick={handleRandomPlay}
+              disabled={loading}
+              className="w-full py-3 rounded-xl border-2 border-brand-500 text-brand-600 font-semibold hover:bg-brand-50 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+              </svg>
+              下一個隨機
+            </button>
+          )}
+
+          {/* Volume */}
+          {audioUrl && (
+            <div className="mt-4 flex items-center gap-3">
+              <svg className="w-4 h-4 text-stone-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.49 4.49 0 0 0 2.5-4z" />
+              </svg>
+              <input
+                type="range"
+                min="0" max="1" step="0.05"
+                value={volume}
+                onChange={(e) => setVolume(parseFloat(e.target.value))}
+                className="range-vol flex-1"
+              />
+              <svg className="w-4 h-4 text-stone-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+              </svg>
+            </div>
+          )}
+
+          {/* Error */}
           {error && (
-            <div className="mt-6 bg-red-500/90 backdrop-blur-sm text-white px-6 py-4 rounded-2xl text-center font-medium shadow-lg">
-              ❌ {error}
+            <div className="mt-5 bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm font-medium text-center">
+              {error}
             </div>
           )}
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="p-6 text-center text-white/60 text-sm">
-        <p>Discover podcasts like flipping radio stations 📻</p>
-      </footer>
     </div>
   );
 }

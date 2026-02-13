@@ -17,6 +17,7 @@ interface RandomResult {
     audioUrl: string;
     duration: number;
     pubDate: Date;
+    appleEpisodeId: string | null;
   };
   startTime: number;
 }
@@ -90,6 +91,7 @@ export class RandomizerService {
         audioUrl: episode.audioUrl,
         duration: episode.duration,
         pubDate: episode.pubDate,
+        appleEpisodeId: episode.appleEpisodeId,
       },
       startTime,
     };
