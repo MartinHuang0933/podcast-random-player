@@ -12,7 +12,7 @@ export class PodcastService {
         take: limit,
         include: {
           _count: {
-            select: { episodes: true, subscriptions: true }
+            select: { episodes: true }
           },
           episodes: {
             orderBy: { pubDate: 'desc' },
@@ -31,8 +31,8 @@ export class PodcastService {
         author: p.author,
         description: p.description,
         coverImage: p.coverImage,
+        applePodcastId: p.applePodcastId,
         episodeCount: p._count.episodes,
-        subscriberCount: p._count.subscriptions,
         latestEpisode: p.episodes[0]?.pubDate || null,
       })),
       pagination: {
@@ -49,7 +49,7 @@ export class PodcastService {
       where: { id },
       include: {
         _count: {
-          select: { episodes: true, subscriptions: true }
+          select: { episodes: true }
         }
       }
     });
@@ -66,8 +66,8 @@ export class PodcastService {
       coverImage: podcast.coverImage,
       website: podcast.website,
       language: podcast.language,
+      applePodcastId: podcast.applePodcastId,
       episodeCount: podcast._count.episodes,
-      subscriberCount: podcast._count.subscriptions,
     };
   }
 

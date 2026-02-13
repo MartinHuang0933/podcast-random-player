@@ -20,11 +20,11 @@ model Podcast {
   feedUrl         String         @unique
   website         String?
   language        String?
+  applePodcastId  String?        // Apple Podcast ID for deep linking
   lastFetchedAt   DateTime       @default(now())
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   episodes        Episode[]
-  subscriptions   Subscription[]
   
   @@index([externalId])
   @@map("podcasts")
@@ -32,51 +32,21 @@ model Podcast {
 
 // Podcast 單集表
 model Episode {
-  id          String     @id @default(cuid())
-  externalId  String     @unique
-  podcastId   String
-  title       String
-  description String?
-  audioUrl    String
-  duration    Int        // 秒數
-  pubDate     DateTime
-  coverImage  String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  podcast     Podcast    @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  bookmarks   Bookmark[]
+  id              String     @id @default(cuid())
+  externalId      String     @unique
+  podcastId       String
+  title           String
+  description     String?
+  audioUrl        String
+  duration        Int        // 秒數
+  pubDate         DateTime
+  coverImage      String?
+  appleEpisodeId  String?    // Apple Podcast episode ID
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  podcast         Podcast    @relation(fields: [podcastId], references: [id], onDelete: Cascade)
   
   @@index([podcastId])
   @@index([pubDate])
   @@map("episodes")
-}
-
-// 收藏表（簡化版，無用戶系統）
-model Bookmark {
-  id          String   @id @default(cuid())
-  sessionId   String   // 用 sessionId 代替 userId
-  episodeId   String
-  currentTime Int      @default(0)
-  note        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  episode     Episode  @relation(fields: [episodeId], references: [id], onDelete: Cascade)
-  
-  @@unique([sessionId, episodeId])
-  @@index([sessionId])
-  @@index([episodeId])
-  @@map("bookmarks")
-}
-
-// 追蹤節目表
-model Subscription {
-  id          String   @id @default(cuid())
-  sessionId   String
-  podcastId   String
-  createdAt   DateTime @default(now())
-  podcast     Podcast  @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  
-  @@unique([sessionId, podcastId])
-  @@index([sessionId])
-  @@map("subscriptions")
 }

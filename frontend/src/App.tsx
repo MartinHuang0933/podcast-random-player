@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { usePlayerStore } from './store/playerStore';
-import { getRandomEpisode, createBookmark, createSubscription } from './services/api';
+import { getRandomEpisode } from './services/api';
 
 function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [podcastData, setPodcastData] = useState<any>(null);
   
   const {
     isPlaying,
@@ -13,7 +13,6 @@ function App() {
     duration,
     volume,
     audioUrl,
-    episodeId,
     episodeTitle,
     podcastTitle,
     coverImage,
@@ -26,13 +25,14 @@ function App() {
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // 處理隨機播放
+  // 处理随机播放
   const handleRandomPlay = async () => {
     setLoading(true);
     setError(null);
     
     try {
       const data = await getRandomEpisode();
+      setPodcastData(data); // 保存完整数据供 Apple Podcast 链接使用
       
       loadAudio({
         audioUrl: data.episode.audioUrl,
@@ -43,7 +43,6 @@ function App() {
         startTime: data.startTime,
       });
       
-      // 等待音訊元素更新
       setTimeout(() => {
         if (audioRef.current) {
           audioRef.current.load();
@@ -53,40 +52,33 @@ function App() {
         }
       }, 100);
     } catch (err: any) {
-      setError(err.response?.data?.error?.message || '載入失敗');
+      setError(err.response?.data?.error?.message || '载入失败');
     } finally {
       setLoading(false);
     }
   };
 
-  // 處理收藏
-  const handleBookmark = async () => {
-    if (!episodeId) return;
+  // 在 Apple Podcast 打开
+  const handleOpenInApple = () => {
+    if (!podcastData) return;
     
-    try {
-      await createBookmark(episodeId, Math.floor(currentTime));
-      showSuccess('已收藏！');
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || '收藏失敗');
+    const applePodcastId = podcastData.podcast.applePodcastId;
+    const appleEpisodeId = podcastData.episode.appleEpisodeId;
+    
+    if (applePodcastId && appleEpisodeId) {
+      // 使用 Apple Podcast 深链接
+      window.open(`https://podcasts.apple.com/podcast/id${applePodcastId}?i=${appleEpisodeId}`, '_blank');
+    } else if (applePodcastId) {
+      // 只有 podcast ID，打开 podcast 主页
+      window.open(`https://podcasts.apple.com/podcast/id${applePodcastId}`, '_blank');
+    } else {
+      // 搜索 podcast 名称
+      const searchQuery = encodeURIComponent(podcastTitle || '');
+      window.open(`https://podcasts.apple.com/search?term=${searchQuery}`, '_blank');
     }
   };
 
-  // 處理追蹤
-  const handleSubscribe = async (podcastId: string) => {
-    try {
-      await createSubscription(podcastId);
-      showSuccess('已追蹤節目！');
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || '追蹤失敗');
-    }
-  };
-
-  const showSuccess = (message: string) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(null), 3000);
-  };
-
-  // 音訊事件處理
+  // 音频事件处理
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -106,7 +98,6 @@ function App() {
     };
   }, []);
 
-  // 控制播放/暫停
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -118,7 +109,6 @@ function App() {
     }
   }, [isPlaying]);
 
-  // 控制音量
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
@@ -140,131 +130,202 @@ function App() {
     }
   };
 
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-teal-400 via-cyan-500 to-blue-500 flex flex-col">
       <audio ref={audioRef} src={audioUrl || undefined} />
       
-      <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
-        <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">
-          🎙️ 隨機 Podcast
-        </h1>
-
-        {/* 封面圖 */}
-        {coverImage && (
-          <div className="mb-6">
-            <img
-              src={coverImage}
-              alt={podcastTitle || 'Podcast'}
-              className="w-full h-64 object-cover rounded-2xl shadow-lg"
-            />
-          </div>
-        )}
-
-        {/* Podcast 資訊 */}
-        {episodeTitle && (
-          <div className="mb-6 text-center">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">
-              {episodeTitle}
-            </h2>
-            <p className="text-gray-600">{podcastTitle}</p>
-          </div>
-        )}
-
-        {/* 進度條 */}
-        {audioUrl && (
-          <div className="mb-4">
-            <input
-              type="range"
-              min="0"
-              max={duration || 0}
-              value={currentTime}
-              onChange={handleSeek}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-            />
-            <div className="flex justify-between text-sm text-gray-600 mt-2">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
+      {/* Header */}
+      <header className="p-6">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg">
+              <span className="text-2xl">🎙️</span>
             </div>
+            <h1 className="text-2xl font-bold text-white">Podcast Radio</h1>
           </div>
-        )}
-
-        {/* 播放控制 */}
-        {audioUrl && (
-          <div className="flex justify-center items-center gap-4 mb-6">
+          
+          {audioUrl && (
             <button
-              onClick={() => setPlaying(!isPlaying)}
-              className="w-16 h-16 bg-purple-600 hover:bg-purple-700 text-white rounded-full flex items-center justify-center text-2xl transition-colors"
+              onClick={handleOpenInApple}
+              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full transition-all font-medium"
             >
-              {isPlaying ? '⏸️' : '▶️'}
+              <span className="text-lg">🎵</span>
+              在 Apple Podcast 打开
             </button>
-          </div>
-        )}
+          )}
+        </div>
+      </header>
 
-        {/* 音量控制 */}
-        {audioUrl && (
-          <div className="mb-6 flex items-center gap-3">
-            <span className="text-gray-600">🔊</span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={volume}
-              onChange={(e) => setVolume(parseFloat(e.target.value))}
-              className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-            />
-          </div>
-        )}
+      {/* Main Content */}
+      <main className="flex-1 flex items-center justify-center p-6">
+        <div className="max-w-2xl w-full">
+          
+          {/* Album Art & Info */}
+          <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20">
+            
+            {coverImage ? (
+              <div className="mb-8">
+                <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-gray-800 to-gray-900">
+                  <img
+                    src={coverImage}
+                    alt={podcastTitle || 'Podcast'}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="mb-8 aspect-square rounded-2xl bg-gradient-to-br from-teal-600 to-cyan-600 flex items-center justify-center shadow-2xl">
+                <span className="text-9xl">🎙️</span>
+              </div>
+            )}
 
-        {/* 動作按鈕 */}
-        <div className="space-y-3">
-          <button
-            onClick={handleRandomPlay}
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-4 rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? '載入中...' : audioUrl ? '🔄 下一個隨機' : '🎲 隨機播放'}
-          </button>
+            {/* Episode Info */}
+            {episodeTitle ? (
+              <div className="mb-8 text-center">
+                <h2 className="text-2xl font-bold text-white mb-2 line-clamp-2">
+                  {episodeTitle}
+                </h2>
+                <p className="text-white/80 text-lg font-medium">{podcastTitle}</p>
+              </div>
+            ) : (
+              <div className="mb-8 text-center">
+                <h2 className="text-3xl font-bold text-white mb-3">
+                  Discover Random Podcasts
+                </h2>
+                <p className="text-white/80 text-lg">
+                  点击下方按钮开始随机收听！
+                </p>
+              </div>
+            )}
 
-          {episodeId && (
-            <div className="flex gap-3">
+            {/* Progress Bar */}
+            {audioUrl && (
+              <div className="mb-6">
+                <div className="relative h-2 bg-white/20 rounded-full overflow-hidden mb-2">
+                  <div
+                    className="absolute left-0 top-0 h-full bg-white rounded-full transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
+                  <input
+                    type="range"
+                    min="0"
+                    max={duration || 0}
+                    value={currentTime}
+                    onChange={handleSeek}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                </div>
+                <div className="flex justify-between text-sm text-white/70 font-medium">
+                  <span>{formatTime(currentTime)}</span>
+                  <span>{formatTime(duration)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Playback Controls */}
+            <div className="flex items-center justify-center gap-6 mb-6">
+              {audioUrl && (
+                <>
+                  <button
+                    onClick={() => {
+                      if (audioRef.current) {
+                        audioRef.current.currentTime = Math.max(0, currentTime - 15);
+                      }
+                    }}
+                    className="w-12 h-12 flex items-center justify-center text-white hover:bg-white/20 rounded-full transition-all"
+                  >
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+                    </svg>
+                    <span className="text-xs absolute mt-12">-15s</span>
+                  </button>
+                </>
+              )}
+
               <button
-                onClick={handleBookmark}
-                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-xl transition-colors"
+                onClick={audioUrl ? () => setPlaying(!isPlaying) : handleRandomPlay}
+                disabled={loading}
+                className="w-20 h-20 bg-white hover:scale-105 text-teal-600 rounded-full flex items-center justify-center text-3xl shadow-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                ⭐ 收藏
+                {loading ? (
+                  <div className="w-8 h-8 border-4 border-teal-600 border-t-transparent rounded-full animate-spin" />
+                ) : isPlaying ? (
+                  '⏸'
+                ) : (
+                  '▶️'
+                )}
               </button>
+
+              {audioUrl && (
+                <button
+                  onClick={() => {
+                    if (audioRef.current) {
+                      audioRef.current.currentTime = Math.min(duration, currentTime + 30);
+                    }
+                  }}
+                  className="w-12 h-12 flex items-center justify-center text-white hover:bg-white/20 rounded-full transition-all"
+                >
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm2 14.5l-6-4.5 6-4.5v9z"/>
+                  </svg>
+                  <span className="text-xs absolute mt-12">+30s</span>
+                </button>
+              )}
+            </div>
+
+            {/* Next Random Button */}
+            {audioUrl && (
               <button
-                onClick={() => handleSubscribe('podcast-id')}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors"
+                onClick={handleRandomPlay}
+                disabled={loading}
+                className="w-full bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-bold py-4 rounded-2xl transition-all transform hover:scale-[1.02] disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                📻 追蹤
+                <span className="text-xl">🎲</span>
+                下一个随机
               </button>
+            )}
+
+            {/* Volume Control */}
+            {audioUrl && (
+              <div className="mt-6 flex items-center gap-4">
+                <span className="text-white text-xl">🔊</span>
+                <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-white rounded-full transition-all"
+                    style={{ width: `${volume * 100}%` }}
+                  />
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={volume}
+                    onChange={(e) => setVolume(parseFloat(e.target.value))}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                </div>
+                <span className="text-white/70 text-sm font-medium min-w-[3ch]">
+                  {Math.round(volume * 100)}%
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mt-6 bg-red-500/90 backdrop-blur-sm text-white px-6 py-4 rounded-2xl text-center font-medium shadow-lg">
+              ❌ {error}
             </div>
           )}
         </div>
+      </main>
 
-        {/* 錯誤訊息 */}
-        {error && (
-          <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
-            {error}
-          </div>
-        )}
-
-        {/* 成功訊息 */}
-        {successMessage && (
-          <div className="mt-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
-            {successMessage}
-          </div>
-        )}
-
-        {/* 說明文字 */}
-        {!audioUrl && (
-          <p className="mt-6 text-center text-gray-600 text-sm">
-            點擊「隨機播放」開始探索新的 Podcast 內容！
-          </p>
-        )}
-      </div>
+      {/* Footer */}
+      <footer className="p-6 text-center text-white/60 text-sm">
+        <p>Discover podcasts like flipping radio stations 📻</p>
+      </footer>
     </div>
   );
 }
