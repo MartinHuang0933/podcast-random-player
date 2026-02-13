@@ -1,193 +1,207 @@
-# 🎙️ 隨機 Podcast 播放器
+# 🎙️ Podcast Radio - 随机 Podcast 播放器
 
-> 像隨機收聽廣播一樣發現新的 Podcast 內容
+> 像拨动收音机频道一样，随机发现新的 Podcast 内容
 
-## 專案概述
+## ✨ 特色功能
 
-一個創新的網頁應用，讓用戶可以：
-- 🎲 隨機跳轉到任意 Podcast 的任意時間點
-- ⭐ 收藏喜歡的內容
-- 📻 追蹤感興趣的節目
-- 🔄 無限探索新內容
+- 🎲 **随机播放** - 随机选择 Podcast episode 并从随机时间点开始播放
+- 🎵 **Apple Podcast 集成** - 一键跳转到 Apple Podcast 应用继续收听
+- 🎨 **现代化 UI** - Spotify 风格的界面设计，亮色青蓝配色
+- ⚡ **即时体验** - 无需注册，点击即可开始探索
 
-## 技術棧
+## 🎯 核心理念
 
-- **前端**: React 18 + TypeScript + Vite + TailwindCSS
-- **後端**: Node.js + Express + TypeScript
-- **資料庫**: PostgreSQL + Prisma ORM
-- **部署**: Zeabur
+传统的 Podcast 应用让你选择困难？试试 **Podcast Radio**！
 
-## 快速開始
+就像拨动收音机频道一样，每次点击都会带你进入一个全新的音频世界。从随机时间点开始听起，如果喜欢，可以一键跳转到 Apple Podcast 从头收听完整内容。
 
-### 前置需求
-- Node.js 18+
-- PostgreSQL 15+
-- npm 或 pnpm
+## 🛠️ 技术栈
 
-### 安裝步驟
+**前端：**
+- React 18 + TypeScript
+- Vite（构建工具）
+- TailwindCSS（样式）
+- Zustand（状态管理）
 
-1. **克隆專案**
+**后端：**
+- Node.js + Express
+- TypeScript
+- Prisma ORM
+- PostgreSQL
+- Helmet + CORS + Rate Limiting
+
+**部署：**
+- Zeabur（推荐）
+- 支持任何 Node.js 托管平台
+
+## 🚀 快速开始
+
+### 本地开发
+
+#### 1. 安装依赖
+
 ```bash
-git clone <repository-url>
-cd podcast-random-player
-```
-
-2. **安裝後端依賴**
-```bash
+# 后端
 cd backend
 npm install
-```
 
-3. **設置環境變數**
-```bash
-cp .env.example .env
-# 編輯 .env 填入必要資訊
-```
-
-4. **執行資料庫 Migration**
-```bash
-npx prisma migrate dev
-npx prisma db seed
-```
-
-5. **啟動後端**
-```bash
-npm run dev
-```
-
-6. **安裝前端依賴（新終端）**
-```bash
-cd ../frontend
+# 前端（新终端）
+cd frontend
 npm install
 ```
 
-7. **啟動前端**
+#### 2. 设置环境变量
+
 ```bash
+# backend/.env
+DATABASE_URL="postgresql://user:password@localhost:5432/podcast_radio"
+PORT=3000
+NODE_ENV=development
+FRONTEND_URL="http://localhost:5173"
+```
+
+#### 3. 初始化数据库
+
+```bash
+cd backend
+npx prisma generate
+npx prisma migrate dev
+npm run seed
+```
+
+#### 4. 启动服务
+
+```bash
+# 后端
+cd backend
+npm run dev
+
+# 前端（新终端）
+cd frontend
 npm run dev
 ```
 
-8. **訪問應用**
+#### 5. 访问应用
+
+打开浏览器访问：`http://localhost:5173`
+
+## 📦 部署到 Zeabur
+
+详细步骤请查看 [ZEABUR_DEPLOY.md](./ZEABUR_DEPLOY.md)
+
+### 快速部署
+
+1. **创建 PostgreSQL 服务**
+2. **创建后端服务**（Root Directory: `backend`）
+3. **创建前端服务**（Root Directory: `frontend`）
+4. **设置环境变量**
+5. **执行数据填充**：在后端 Console 运行 `npm run seed`
+
+## 🎨 UI 设计
+
+界面采用 Spotify 风格的卡片设计，配以亮丽的青蓝渐变色系：
+
+- **主色调**：Teal (青色) → Cyan (蓝绿) → Blue (蓝色)
+- **设计语言**：毛玻璃效果 + 圆角卡片 + 柔和阴影
+- **响应式**：完美适配手机、平板、桌面
+
+## 📡 API 端点
+
+### 核心 API
+
 ```
-http://localhost:5173
+GET  /api/random        # 获取随机 episode
+GET  /api/random/next   # 下一个随机 episode
+GET  /api/podcasts      # 获取 podcast 列表
+GET  /api/podcasts/:id  # 获取 podcast 详情
+GET  /api/health        # 健康检查
 ```
 
-## 專案結構
+## 🔗 Apple Podcast 深链接
+
+应用支持直接跳转到 Apple Podcast：
+
+- 如果数据中有 `applePodcastId` 和 `appleEpisodeId`，将直接打开该集
+- 如果只有 `applePodcastId`，将打开该 Podcast 主页
+- 否则将在 Apple Podcast 中搜索该节目名称
+
+## 📊 数据模型
+
+```
+Podcast (节目)
+├── id
+├── title
+├── author
+├── coverImage
+├── applePodcastId  ← 新增：Apple Podcast 链接
+└── episodes[]
+
+Episode (单集)
+├── id
+├── title
+├── audioUrl
+├── duration
+├── appleEpisodeId  ← 新增：Apple Podcast 链接
+└── podcast
+```
+
+## 🎯 项目结构
 
 ```
 podcast-random-player/
-├── frontend/          # React 前端
-├── backend/           # Node.js API
-├── docs/              # 文檔
-└── tests/             # 測試
+├── backend/               # Node.js + Express API
+│   ├── src/
+│   │   ├── controllers/   # 2 个控制器
+│   │   ├── services/      # 2 个服务
+│   │   └── routes/        # API 路由
+│   ├── prisma/
+│   │   ├── schema.prisma  # 数据模型
+│   │   └── seed.ts        # 测试数据
+│   └── package.json
+│
+├── frontend/              # React 前端
+│   ├── src/
+│   │   ├── App.tsx        # 主应用
+│   │   ├── services/      # API 客户端
+│   │   └── store/         # 状态管理
+│   └── package.json
+│
+└── docs/                  # 文档
+    ├── ZEABUR_DEPLOY.md
+    └── ...
 ```
 
-## 核心功能
+## 🔄 v2.0 更新内容
 
-### 1️⃣ 隨機播放
-點擊「隨機播放」按鈕，系統會：
-- 隨機選擇一個 Podcast
-- 隨機選擇其中一集
-- 跳到隨機時間點開始播放
+### ✅ 新增功能
 
-### 2️⃣ 收藏功能
-- 喜歡正在聽的內容？立即收藏
-- 記錄當前播放進度
-- 稍後繼續收聽
+- 🎵 Apple Podcast 集成
+- 🎨 全新 UI 设计（Spotify 风格）
+- 🌈 亮色青蓝配色方案
 
-### 3️⃣ 追蹤節目
-- 追蹤整個 Podcast 節目
-- 瀏覽所有 episodes
-- 持續關注新內容
+### 🗑️ 移除功能
 
-## 測試
+- ❌ 收藏功能（简化用户体验）
+- ❌ 追踪功能（专注随机发现）
+- ❌ 用户系统（无需注册）
 
-```bash
-# 單元測試
-npm run test:unit
+### 🎯 设计理念
 
-# 整合測試
-npm run test:integration
+**从"管理"到"发现"** - 不再让用户管理收藏和订阅，而是专注于随机发现的乐趣。喜欢的内容可以一键跳转到 Apple Podcast 继续收听和订阅。
 
-# E2E 測試
-npm run test:e2e
-
-# 所有測試 + 覆蓋率
-npm run test:all
-```
-
-## 部署到 Zeabur
-
-1. 推送代碼到 GitHub
-2. 登入 Zeabur Dashboard
-3. 連接 repository
-4. 配置環境變數
-5. 部署！
-
-詳細步驟見 [PROJECT_PLAN.md](./PROJECT_PLAN.md) 第四章。
-
-## API 文檔
-
-### 主要端點
-
-```
-GET  /api/random              # 獲取隨機 episode
-GET  /api/random/next         # 下一個隨機
-POST /api/bookmarks           # 新增收藏
-GET  /api/bookmarks           # 獲取收藏列表
-POST /api/subscriptions       # 追蹤節目
-GET  /api/subscriptions       # 獲取追蹤列表
-```
-
-完整 API 文檔見 [docs/API.md](./docs/API.md)
-
-## 開發指南
-
-### 添加新功能
-
-1. 在 `backend/src/services/` 創建業務邏輯
-2. 在 `backend/src/controllers/` 創建控制器
-3. 在 `backend/src/routes/` 註冊路由
-4. 在 `frontend/src/services/` 創建 API 客戶端
-5. 在 `frontend/src/components/` 創建 UI 元件
-6. 撰寫測試
-
-### 代碼風格
-
-```bash
-# 檢查代碼風格
-npm run lint
-
-# 自動修復
-npm run lint:fix
-
-# 格式化代碼
-npm run format
-```
-
-## 貢獻
-
-歡迎貢獻！請先閱讀 [CONTRIBUTING.md](./CONTRIBUTING.md)
-
-## 授權
+## 📄 授权
 
 MIT License
 
-## 聯絡方式
+## 🤝 贡献
 
-- Issues: [GitHub Issues](https://github.com/yourusername/podcast-random-player/issues)
-- Discussions: [GitHub Discussions](https://github.com/yourusername/podcast-random-player/discussions)
+欢迎提交 Issue 和 Pull Request！
+
+## 📧 联系方式
+
+- GitHub: [MartinHuang0933/podcast-random-player](https://github.com/MartinHuang0933/podcast-random-player)
+- Issues: [提交问题](https://github.com/MartinHuang0933/podcast-random-player/issues)
 
 ---
 
-## 📚 完整文檔
-
-| 文檔 | 內容 | 適合對象 |
-|------|------|---------|
-| 📖 [INDEX.md](./INDEX.md) | 文檔索引（快速查找） | 所有人 |
-| 📋 [SUMMARY.md](./SUMMARY.md) | 專案摘要總覽 | 專案經理、決策者 |
-| 📘 [PROJECT_PLAN.md](./PROJECT_PLAN.md) | 完整規劃（37KB）| 開發團隊 |
-| 🏗️ [ARCHITECTURE.md](./ARCHITECTURE.md) | 系統架構、演算法 | 架構師、後端 |
-| 🔌 [API.md](./API.md) | API 介面文檔 | 前後端開發 |
-| ✅ [CHECKLIST.md](./CHECKLIST.md) | 開發檢查清單 | 開發團隊 |
-
-**💡 提示**：不知道從哪開始？查看 [INDEX.md](./INDEX.md) 快速找到你需要的文檔！
+**🎉 开始你的随机 Podcast 之旅！** 🎧
