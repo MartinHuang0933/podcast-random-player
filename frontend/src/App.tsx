@@ -134,7 +134,7 @@ function App() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col items-center px-5 py-2">
+      <main className="flex-1 flex flex-col items-center justify-center px-5 py-2">
         <div className="max-w-lg w-full">
 
           {/* Cover art */}
